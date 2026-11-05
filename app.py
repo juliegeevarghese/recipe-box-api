@@ -7,12 +7,19 @@ That is the point: you will add both, lesson by lesson, in Units 2 and 3.
 
 import sqlite3
 
+from werkzeug.security import generate_password_hash, check_password_hash
+
 from flask import Flask, g, jsonify, request
 
 DATABASE = "recipes.db"
 
 app = Flask(__name__)
 
+def hash_password(plain_password: str) -> str:
+    return generate_password_hash(plain_password)
+
+def verify_password(stored_hash: str, candidate_password: str) -> bool:
+    return check_password_hash(stored_hash, candidate_password) 
 
 def get_db():
     if "db" not in g:
@@ -59,7 +66,6 @@ def get_recipe(recipe_id):
         return jsonify({"error": "recipe not found"}), 404
     return jsonify(recipe_to_dict(row))
 
-
 @app.post("/recipes")
 def create_recipe():
     data = request.get_json(silent=True)
@@ -85,6 +91,37 @@ def create_recipe():
     ).fetchone()
     return jsonify(recipe_to_dict(row)), 201
 
+@app.post("/register")
+def register():
+    data = request.get_json()
+
+    if not data:
+        return {"error": "Request body must be JSON"}, 400
+
+    username = (data.get("username") or "").strip()
+    email = (data.get("email") or "").strip()
+    password = data.get("password") or ""
+
+    if not username or not email or not password:
+        return {"error": "Missing username, email, or password"}, 400
+
+    password_hash = generate_password_hash(password)
+
+    db = get_db()
+    try:
+        cursor = db.execute(
+            "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+            (username, email, password_hash),
+        )
+        db.commit()
+    except sqlite3.IntegrityError:
+        return {"error": "User already exists"}, 409
+
+    return {
+        "id": cursor.lastrowid,
+        "username": username,
+        "email": email,
+    }, 201
 
 @app.patch("/recipes/<int:recipe_id>")
 def update_recipe(recipe_id):
