@@ -123,6 +123,37 @@ def register():
         "email": email,
     }, 201
 
+@app.post("/login")
+def login():
+    data = request.get_json() or {}
+
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+
+    if not username or not password:
+        return {"error": "username and password are required"}, 400
+
+    db = get_db()
+    cursor = db.execute(
+        "SELECT id, username, email, password_hash FROM users WHERE username = ?",
+        (username,),
+    )
+    user = cursor.fetchone()
+
+    if user is None:
+        return {"error": "invalid credentials"}, 401
+
+    if not check_password_hash(user["password_hash"], password):
+        return {"error": "invalid credentials"}, 401
+
+    return {
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "email": user["email"],
+        }
+    }, 200
+
 @app.patch("/recipes/<int:recipe_id>")
 def update_recipe(recipe_id):
     data = request.get_json(silent=True)
