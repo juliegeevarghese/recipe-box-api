@@ -11,6 +11,21 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from flask import Flask, g, jsonify, request
 
+import os
+
+import jwt
+
+from datetime import datetime, timedelta
+
+from dotenv import load_dotenv 
+
+
+load_dotenv()
+
+JWT_SECRET = os.environ.get("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET is not set")
+
 DATABASE = "recipes.db"
 
 app = Flask(__name__)
@@ -144,15 +159,18 @@ def login():
         return {"error": "invalid credentials"}, 401
 
     if not check_password_hash(user["password_hash"], password):
-        return {"error": "invalid credentials"}, 401
+        return {"error": "invalid credentials"}, 401    
 
-    return {
-        "user": {
-            "id": user["id"],
-            "username": user["username"],
-            "email": user["email"],
-        }
-    }, 200
+    payload = {
+        "sub": str(user["id"]),               # id as STRING
+        "username": user["username"],
+        "exp": datetime.utcnow() + timedelta(hours=1),
+    }
+
+    token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
+    return {"token": token}, 200
+
 
 @app.patch("/recipes/<int:recipe_id>")
 def update_recipe(recipe_id):
