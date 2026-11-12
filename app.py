@@ -83,6 +83,24 @@ def get_recipe(recipe_id):
         return jsonify({"error": "recipe not found"}), 404
     return jsonify(recipe_to_dict(row))
 
+@app.get("/debug-decode")
+def debug_decode():
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return {"error": "no bearer"}, 400
+
+    token = auth_header.split(" ", 1)[1]
+
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return {"status": "ok", "payload": payload}, 200
+    except Exception as e:
+        return {
+            "status": "error",
+            "type": type(e).__name__,
+            "message": str(e),
+        }, 401 
+
 @app.post("/recipes")
 def create_recipe():
     # 1 Read Authorization header
@@ -93,9 +111,11 @@ def create_recipe():
     # 2 Pull out the token string
     token = auth_header.split(" ", 1)[1]
 
-    # 3 Verify token
+    #3 Verify token
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "token expired, please log in again"}), 401
     except jwt.InvalidTokenError:
         return jsonify({"error": "Invalid token"}), 401
 
@@ -189,7 +209,7 @@ def login():
     payload = {
         "sub": str(user["id"]),               # id as STRING
         "username": user["username"],
-        "exp": datetime.utcnow() + timedelta(hours=1),
+        "exp": datetime.utcnow() + timedelta(minutes=30),
     }
 
     token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
@@ -208,6 +228,8 @@ def update_recipe(recipe_id):
 
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "token expired, please log in again"}), 401
     except jwt.InvalidTokenError:
         return jsonify({"error": "Invalid token"}), 401
 
@@ -257,6 +279,8 @@ def delete_recipe(recipe_id):
 
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "token expired, please log in again"}), 401
     except jwt.InvalidTokenError:
         return jsonify({"error": "Invalid token"}), 401
 
