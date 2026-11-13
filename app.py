@@ -123,6 +123,7 @@ def create_recipe():
     request.user = {
         "id": payload.get("sub"),
         "username": payload.get("username"),
+        "role": payload.get("role"),  # 👈 NEW: role claim 
     }
 
     # 5 Existing create logic
@@ -196,7 +197,7 @@ def login():
 
     db = get_db()
     cursor = db.execute(
-        "SELECT id, username, email, password_hash FROM users WHERE username = ?",
+        "SELECT id, username, email, password_hash, role FROM users WHERE username = ?",
         (username,),
     )
     user = cursor.fetchone()
@@ -210,13 +211,13 @@ def login():
     payload = {
         "sub": str(user["id"]),               # id as STRING
         "username": user["username"],
+        "role": user["role"],                # 👈 NEW: role claim
         "exp": datetime.utcnow() + timedelta(minutes=30),
     }
 
     token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
     return {"token": token}, 200
-
 
 @app.patch("/recipes/<int:recipe_id>")
 def update_recipe(recipe_id):
@@ -237,6 +238,7 @@ def update_recipe(recipe_id):
     request.user = {
         "id": payload.get("sub"),
         "username": payload.get("username"),
+        "role": payload.get("role"),  # 👈 NEW: role claim
     }
 
     db = get_db()
@@ -248,8 +250,11 @@ def update_recipe(recipe_id):
     if row is None:
         return jsonify({"error": "recipe not found"}), 404
 
-    # 2) Enforce ownership
-    if row["owner_id"] != request.user["id"]:
+        # 2) Enforce admin-or-owner
+    is_owner = row["owner_id"] == request.user["id"]
+    is_admin = request.user.get("role") == "admin"
+
+    if not is_owner and not is_admin:
         return jsonify({"error": "forbidden: not your recipe"}), 403
 
     # 3) Build update fields
@@ -302,6 +307,7 @@ def delete_recipe(recipe_id):
     request.user = {
         "id": payload.get("sub"),
         "username": payload.get("username"),
+        "role": payload.get("role"),  # 👈 NEW: role claim
     }
 
     db = get_db()
@@ -313,8 +319,11 @@ def delete_recipe(recipe_id):
     if row is None:
         return jsonify({"error": "recipe not found"}), 404
 
-    # 2) Enforce ownership
-    if row["owner_id"] != request.user["id"]:
+        # 2) Enforce admin-or-owner
+    is_owner = row["owner_id"] == request.user["id"]
+    is_admin = request.user.get("role") == "admin"
+
+    if not is_owner and not is_admin:
         return jsonify({"error": "forbidden: not your recipe"}), 403
 
     # 3) Perform delete
