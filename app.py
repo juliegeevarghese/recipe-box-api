@@ -9,6 +9,8 @@ import sqlite3
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from functools import wraps 
+
 from flask import Flask, g, jsonify, request
 
 import os
@@ -45,6 +47,31 @@ def get_db():
         g.db.execute("PRAGMA foreign_keys = ON")
     return g.db
 
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Missing or invalid Authorization header"}), 401
+
+        token = auth_header.split(" ", 1)[1]
+
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        except jwt.ExpiredSignatureError:
+            return jsonify({"error": "token expired, please log in again"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"error": "Invalid token"}), 401
+
+        request.user = {
+            "id": payload.get("sub"),
+            "username": payload.get("username"),
+            "role": payload.get("role"),
+        }
+
+        return f(*args, **kwargs)
+
+    return decorated 
 
 @app.teardown_appcontext
 def close_db(exception):
@@ -220,27 +247,8 @@ def login():
     return {"token": token}, 200
 
 @app.patch("/recipes/<int:recipe_id>")
+@token_required
 def update_recipe(recipe_id):
-    # Auth guard
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return jsonify({"error": "Missing or invalid Authorization header"}), 401
-
-    token = auth_header.split(" ", 1)[1]
-
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-    except jwt.ExpiredSignatureError:
-        return jsonify({"error": "token expired, please log in again"}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({"error": "Invalid token"}), 401
-
-    request.user = {
-        "id": payload.get("sub"),
-        "username": payload.get("username"),
-        "role": payload.get("role"),  # 👈 NEW: role claim
-    }
-
     db = get_db()
 
     # 1) Load recipe first
@@ -250,14 +258,14 @@ def update_recipe(recipe_id):
     if row is None:
         return jsonify({"error": "recipe not found"}), 404
 
-        # 2) Enforce admin-or-owner
-    is_owner = row["owner_id"] == request.user["id"]
+    # 2) Enforce admin-or-owner
+    is_owner = str(row["owner_id"]) == request.user["id"] 
     is_admin = request.user.get("role") == "admin"
 
     if not is_owner and not is_admin:
         return jsonify({"error": "forbidden: not your recipe"}), 403
 
-    # 3) Build update fields
+    # 3) Build update fields  (unchanged from your version)
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "a JSON body is required"}), 400
@@ -289,27 +297,8 @@ def update_recipe(recipe_id):
 
 
 @app.delete("/recipes/<int:recipe_id>")
+@token_required
 def delete_recipe(recipe_id):
-    # Auth guard
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return jsonify({"error": "Missing or invalid Authorization header"}), 401
-
-    token = auth_header.split(" ", 1)[1]
-
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-    except jwt.ExpiredSignatureError:
-        return jsonify({"error": "token expired, please log in again"}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({"error": "Invalid token"}), 401
-
-    request.user = {
-        "id": payload.get("sub"),
-        "username": payload.get("username"),
-        "role": payload.get("role"),  # 👈 NEW: role claim
-    }
-
     db = get_db()
 
     # 1) Load recipe first
@@ -319,8 +308,8 @@ def delete_recipe(recipe_id):
     if row is None:
         return jsonify({"error": "recipe not found"}), 404
 
-        # 2) Enforce admin-or-owner
-    is_owner = row["owner_id"] == request.user["id"]
+    # 2) Enforce admin-or-owner
+    is_owner = str(row["owner_id"]) == request.user["id"]
     is_admin = request.user.get("role") == "admin"
 
     if not is_owner and not is_admin:
