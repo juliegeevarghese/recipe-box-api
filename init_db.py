@@ -56,7 +56,8 @@ connection.execute(
         1,
         "admin",
         "admin@example.com",
-        "scrypt:32768:8:1$9AorjlWBnWigappN$5d39b20fee21eeb719be08dedfb2c2170527964cb3f1407ba7c76f183a86c262dcf7cc3248343c3a906b1f27233a77ecca6adb6e67494e3c7b3df4de44967c04",
+        # hash for password "secret123"
+        "scrypt:32768:8:1$5kpKhdF25LhCcygC$306787d73f519f278620bfd282426b893ceb83111c63b15cc4959a9c083dca8056000359b735789711fa2167642bf6eae82d412404eae44fd4ebfed0f02adaaa",
         "admin",
     ),
 )
