@@ -7,12 +7,16 @@ passwords, JSON Web Tokens, ownership rules, and middleware.
 
 ## Run it
 
-```
+```bash
 python init_db.py
-python app.py
+python wsgi.py
 ```
 
 Requires Python 3.10+ and Flask (`pip install -r requirements.txt`).
+
+## Notes 
+
+- Refactored the app to use a Flask application factory so the same codebase can create multiple independently configured app instances instead of relying on a single global app object.
 
 ## Try it
 
