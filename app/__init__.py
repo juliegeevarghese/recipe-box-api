@@ -6,7 +6,9 @@ That is the point: you will add both, lesson by lesson, in Units 2 and 3.
 """
 
 from dataclasses import fields
+
 import sqlite3
+
 import token
 
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -14,6 +16,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps 
 
 from flask import Flask, g, jsonify, request
+
+from config import DevelopmentConfig, TestingConfig, ProductionConfig 
 
 import os
 
@@ -38,7 +42,15 @@ from flask import Flask
 
 def create_app(config_name=None):
     app = Flask(__name__)
-
+    if config_name == "development" or config_name is None:
+        app.config.from_object(DevelopmentConfig)
+    elif config_name == "testing":
+        app.config.from_object(TestingConfig)
+    elif config_name == "production":
+        app.config.from_object(ProductionConfig)
+    else:
+        raise ValueError(f"Unknown config_name: {config_name}")
+    
     @app.teardown_appcontext
     def close_db(exception):
         db = g.pop("db", None)
