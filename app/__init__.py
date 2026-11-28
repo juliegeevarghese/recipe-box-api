@@ -6,28 +6,18 @@ That is the point: you will add both, lesson by lesson, in Units 2 and 3.
 """
 
 from dataclasses import fields
-
+from functools import wraps 
+from datetime import datetime, timedelta
+import os
 import sqlite3
-
 import token
 
+import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
-
-from functools import wraps 
-
 from flask import Flask, g, jsonify, request
 
 from config import DevelopmentConfig, TestingConfig, ProductionConfig 
-
-import os
-
-import jwt
-
-from datetime import datetime, timedelta
-
-from dotenv import load_dotenv 
-
-
+from dotenv import load_dotenv
 load_dotenv()
 
 JWT_SECRET = os.environ.get("JWT_SECRET")
@@ -36,9 +26,9 @@ if not JWT_SECRET:
 
 JWT_ALGORITHM = "HS256"
 
-DATABASE = "recipes.db"
-
-from flask import Flask
+DATABASE = os.environ.get("DATABASE_URL")
+if not DATABASE:
+    raise RuntimeError("DATABASE_URL is not set")
 
 def create_app(config_name=None):
     app = Flask(__name__)

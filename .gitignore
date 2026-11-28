@@ -2,6 +2,9 @@
 venv/
 .venv/
 
+# Editor settings
+.vscode/
+
 # Python caches
 __pycache__/
 *.pyc
